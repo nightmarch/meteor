@@ -324,6 +324,7 @@ var AppRunner = function (appDir, options) {
   self.startFuture = null;
   self.runFuture = null;
   self.exitFuture = null;
+  self.watchFuture = null;
 };
 
 _.extend(AppRunner.prototype, {
@@ -338,7 +339,8 @@ _.extend(AppRunner.prototype, {
     self.startFuture = new Future;
     self.fiber = new Fiber(function () {
       self._fiber();
-    }).run();
+    });
+    self.fiber.run();
     self.startFuture.wait();
     self.startFuture = null;
   },
@@ -574,13 +576,16 @@ _.extend(AppRunner.prototype, {
       }
 
       if (self.watchForChanges) {
-        var fut = new Future;
+        self.watchFuture = new Future;
         var watcher = new watch.Watcher({
           watchSet: runResult.bundleResult.watchSet,
-          onChange: function () { fut['return'](); }
+          onChange: function () {
+            self.watchFuture && self.watchFuture.return();
+          }
         });
         self.proxy.setMode("errorpage");
-        fut.wait();
+        self.watchFuture.wait();
+        self.watchFuture = null;
         runLog.log("=> Modified -- restarting.");
         continue;
       }
@@ -593,6 +598,8 @@ _.extend(AppRunner.prototype, {
       self.exitFuture['return']();
     if (self.startFuture)
       self.startFuture['return']();
+    if (self.watchFuture)
+      self.watchFuture['return']();
 
     self.fiber = null;
   }
