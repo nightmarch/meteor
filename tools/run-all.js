@@ -116,7 +116,10 @@ _.extend(Runner.prototype, {
         var mongoProgressTimer = setInterval(printUpdate, 200);
       }
 
+      runLog.log("CALLING MR")
+      try {
       self.mongoRunner.start();
+      } finally { runLog.log("DONE MR") }
 
       if (! self.quiet) {
         clearInterval(mongoProgressTimer);
@@ -234,6 +237,7 @@ exports.run = function (appDir, options) {
       // the failure happens while runner.start() is still running, we want the
       // rest of start to stop, and it's not like fut['return'] magically makes
       // us jump to a fut.wait() that hasn't happened yet!.
+      runLog.log("RUNNER IS STOPPING NOW??")
       runner.stop();
       fut.isResolved() || fut['return']({ outcome: 'failure' });
     },

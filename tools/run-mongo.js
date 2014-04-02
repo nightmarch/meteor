@@ -167,6 +167,9 @@ var StoppedDuringLaunch = function () {};
 // mongo failover, not for normal development or production use.
 var launchMongo = function (options) {
   var onExit = options.onExit || function () {};
+  var ID = utils.randomToken()
+  runLog.log("LAUNCH" + ID)
+  console.trace()
 
   var noOplog = false;
   var mongod_path = path.join(
@@ -208,6 +211,7 @@ var launchMongo = function (options) {
 
   var handle = {
     stop: function () {
+      runLog.log("launchmongo stop")
       if (stopped)
         return;
       stopped = true;
@@ -215,7 +219,9 @@ var launchMongo = function (options) {
         handle.stop();
       });
 
+      runLog.log("sf throw")
       stopFuture.throw(new StoppedDuringLaunch);
+      runLog.log("sf thrown")
     }
   };
 
@@ -226,7 +232,9 @@ var launchMongo = function (options) {
     var proc = null;
     var procExitHandler;
 
+    runLog.log("finding,killing")
     findMongoAndKillItDead(port);
+    runLog.log("found,killed")
 
     if (options.multiple) {
       // This is only for testing, so we're OK with incurring the replset
@@ -294,6 +302,7 @@ var launchMongo = function (options) {
       '--oplogSize', '8',
       '--replSet', replSetName
     ]);
+    runLog.log("spawning")
     subHandles.push({
       stop: function () {
         if (proc) {
@@ -305,6 +314,7 @@ var launchMongo = function (options) {
     });
 
     procExitHandler = inFiber(function (code, signal) {
+      runLog.log("ONEXIT")
       // Defang subHandle.stop().
       proc = null;
 
@@ -359,8 +369,13 @@ var launchMongo = function (options) {
     proc.stderr.on('data', function (data) {
       stderrOutput += data;
     });
-
+    runLog.log("WAITING FOR ONE")
+    try {
     fiberHelpers.waitForOne(stopFuture, readyToTalkFuture);
+    } finally {
+    runLog.log("WAITED FOR ONEf")
+    }
+    runLog.log("WAITED FOR ONEn")
   };
 
 
@@ -374,6 +389,7 @@ var launchMongo = function (options) {
       })['mongo-livedata'].MongoInternals.NpmModule;
 
       // Connect to the intended primary and start a replset.
+      runLog.log("A")
       var db = new mongoNpmModule.Db(
         'meteor',
         new mongoNpmModule.Server('127.0.0.1', options.port, {poolSize: 1}),
@@ -381,6 +397,7 @@ var launchMongo = function (options) {
       yieldingMethod(db, 'open');
       if (stopped)
         return;
+      runLog.log("B")
       var configuration = {
         _id: replSetName,
         members: [{_id: 0, host: '127.0.0.1:' + options.port, priority: 100}]
@@ -411,10 +428,13 @@ var launchMongo = function (options) {
                       initiateResult.documents[0].errmsg);
         }
       }
+runLog.log("C")
       // XXX timeout eventually?
       while (!stopped) {
+        runLog.log("D" + stopped)
         var status = yieldingMethod(db.admin(), 'command',
                                     {replSetGetStatus: 1});
+        runLog.log("D-uh" + stopped)
         if (!(status && status.documents && status.documents[0]))
           throw status;
         status = status.documents[0];
@@ -477,13 +497,17 @@ var launchMongo = function (options) {
       _.each(_.range(3), function (i) {
         // Did we get stopped (eg, by one of the processes exiting) by now? Then
         // don't start anything new.
+        runLog.log("starting a mongo" + stopped + i + ">>>" + ID)
         if (stopped)
           return;
         var dbPath = path.join(options.appDir, '.meteor', 'local', 'dbs', ''+i);
         launchOneMongoAndWaitForReadyForInitiate(dbPath, options.port + i);
+        runLog.log("started a mongo" + stopped + i)
       });
+      runLog.log("initing" + stopped)
       if (!stopped) {
         initiateReplSetAndWaitForReady();
+        runLog.log("inited" + stopped)
       }
     } else {
       var dbPath = path.join(options.appDir, '.meteor', 'local', 'db');
@@ -610,6 +634,7 @@ _.extend(MongoRunner.prototype, {
     // If we're in multiple mode, we never try to restart. That's to keep the
     // test-only multiple code simple.
     if (self.multiple) {
+      runLog.log("ON FAILURE")
       self._fail();
       return;
     }

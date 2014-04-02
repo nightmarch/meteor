@@ -68,11 +68,20 @@ exports.waitForOne = function (/* futures */) {
     }
     // Otherwise, this function will be invoked when the future is resolved.
     f.resolve(function (err, result) {
+      console.log("IN THE RESOLVE",!!err, !!result)
       if (!combinedFuture.isResolved()) {
+        console.log("IN THE RESOLVE2",!!err, !!result)
         combinedFuture.resolver()(err, result);
       }
     });
   }
-
+  console.trace("in WFONE")
+try{
   return combinedFuture.wait();
+} catch (e) {
+  console.log("before WFONE", e)
+  throw e
+} finally {
+  console.log("from WFONE")
+}
 };
